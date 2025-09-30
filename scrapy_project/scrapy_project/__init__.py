@@ -1,0 +1,1 @@
+# This file makes scrapy_project a Python package
