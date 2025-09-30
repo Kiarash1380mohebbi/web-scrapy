@@ -1,0 +1,5 @@
+streamlit
+scrapy
+pandas
+requests
+lxml
