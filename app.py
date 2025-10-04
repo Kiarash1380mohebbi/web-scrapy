@@ -7,6 +7,39 @@ import time
 from pathlib import Path
 
 
+def normalize_query(raw_query: str) -> str:
+    """
+    Normalize the input query for better bilingual (FA/EN) matching:
+    - Unify Arabic/Persian variants of Yeh/Kaf
+    - Normalize Persian/Arabic digits to ASCII
+    - Remove zero-width and tatweel characters
+    - Collapse extra whitespace
+    """
+    if not raw_query:
+        return ""
+
+    # Zero-width and tatweel characters
+    ZERO_WIDTH_CHARS = ["\u200c", "\u200f", "\u200e", "\u202a", "\u202b", "\u202c", "\u0640"]
+    query = raw_query
+    for ch in ZERO_WIDTH_CHARS:
+        query = query.replace(ch, " ")
+
+    # Arabic Yeh/Kaf to Persian forms
+    query = query.replace("ي", "ی").replace("ك", "ک")
+
+    # Persian and Arabic digits to ASCII
+    persian_digits = "۰۱۲۳۴۵۶۷۸۹"
+    arabic_digits = "٠١٢٣٤٥٦٧٨٩"
+    ascii_digits = "0123456789"
+    trans_map = {ord(p): ord(a) for p, a in zip(persian_digits, ascii_digits)}
+    trans_map.update({ord(p): ord(a) for p, a in zip(arabic_digits, ascii_digits)})
+    query = query.translate(trans_map)
+
+    # Normalize whitespace
+    query = " ".join(query.split())
+    return query
+
+
 def main():
     """
     Main Streamlit application for the Iranian Product Search Engine.
@@ -59,7 +92,8 @@ def search_products(query):
         
         try:
             # Clean up previous results
-            results_file = Path("results.json")
+            # Always write/read results at project root with an absolute path
+            results_file = Path("results.json").resolve()
             if results_file.exists():
                 results_file.unlink()
                 status_text.text("🧹 Cleaning previous results...")
@@ -69,11 +103,19 @@ def search_products(query):
             status_text.text("🚀 Starting web scraping...")
             progress_bar.progress(20)
             
+            normalized_query = normalize_query(query)
+
             # Change to scrapy project directory and run the spider
             scrapy_cmd = [
-                "scrapy", "crawl", "product_search", 
-                "-a", f"query={query}",
-                "-L", "WARNING"  # Reduce log verbosity
+                "scrapy", "crawl", "product_search",
+                "-a", f"query={normalized_query}",
+                # Reduce log verbosity
+                "-L", "WARNING",
+                # Export results to the absolute results.json path
+                "-O", str(results_file),
+                # Ensure correct encoding and that an (even empty) file is written
+                "-s", "FEED_EXPORT_ENCODING=utf-8",
+                "-s", "FEED_STORE_EMPTY=True",
             ]
             
             status_text.text("🕷️ Crawling websites...")
@@ -181,9 +223,7 @@ def clean_dataframe(df):
     if 'price' in df.columns:
         # Convert price to numeric, handling any remaining text
         df['price'] = pd.to_numeric(df['price'], errors='coerce')
-        # Remove rows with invalid prices
-        df = df.dropna(subset=['price'])
-        # Format price display
+        # Do NOT drop rows with missing price; show N/A instead
         df['price_display'] = df['price'].apply(lambda x: f"{x:,.0f}" if pd.notna(x) else "N/A")
     
     # Ensure URL column exists

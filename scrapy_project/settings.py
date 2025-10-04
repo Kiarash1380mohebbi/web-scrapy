@@ -12,8 +12,8 @@ BOT_NAME = 'scrapy_project'
 SPIDER_MODULES = ['scrapy_project.spiders']
 NEWSPIDER_MODULE = 'scrapy_project.spiders'
 
-# Obey robots.txt rules
-ROBOTSTXT_OBEY = True
+# Do not obey robots.txt (target sites often block search scraping)
+ROBOTSTXT_OBEY = False
 
 # Configure a realistic user agent to avoid being blocked
 USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
