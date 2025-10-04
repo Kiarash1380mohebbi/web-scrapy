@@ -10,7 +10,7 @@ from itemadapter import ItemAdapter
 class CleanPricePipeline:
     """
     Pipeline to clean and normalize price data.
-    Removes currency symbols, commas, and converts to numeric format.
+    Enhanced to handle both English and Persian price formats.
     """
     
     def process_item(self, item, spider):
@@ -20,10 +20,25 @@ class CleanPricePipeline:
             # Remove common Persian/Farsi currency symbols and text
             price_text = str(adapter['price'])
             
-            # Remove common currency symbols and text
-            price_text = re.sub(r'[تومان|ریال|درهم|,،]', '', price_text)
+            # Remove common currency symbols and text (both English and Persian)
+            price_text = re.sub(r'(تومان|ریال|درهم|Toman|Rial|USD|$|€|£)', '', price_text)
+            
+            # Remove commas and Persian comma
+            price_text = re.sub(r'[,،]', '', price_text)
+            
+            # Remove extra whitespace
+            price_text = re.sub(r'\s+', ' ', price_text.strip())
             
             # Extract numeric values (including decimals)
+            # Handle both English and Persian digits
+            persian_digits = '۰۱۲۳۴۵۶۷۸۹'
+            english_digits = '0123456789'
+            
+            # Convert Persian digits to English
+            for persian, english in zip(persian_digits, english_digits):
+                price_text = price_text.replace(persian, english)
+            
+            # Extract numeric values
             price_numbers = re.findall(r'[\d\.]+', price_text)
             
             if price_numbers:

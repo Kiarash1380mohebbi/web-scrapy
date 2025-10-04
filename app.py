@@ -59,7 +59,7 @@ def search_products(query):
         
         try:
             # Clean up previous results
-            results_file = Path("results.json")
+            results_file = Path("scrapy_project/results.json")
             if results_file.exists():
                 results_file.unlink()
                 status_text.text("🧹 Cleaning previous results...")
@@ -71,7 +71,7 @@ def search_products(query):
             
             # Change to scrapy project directory and run the spider
             scrapy_cmd = [
-                "scrapy", "crawl", "product_search", 
+                os.path.expanduser("~/.local/bin/scrapy"), "crawl", "product_search", 
                 "-a", f"query={query}",
                 "-L", "WARNING"  # Reduce log verbosity
             ]
@@ -123,7 +123,7 @@ def display_results(query):
     Args:
         query (str): The original search query
     """
-    results_file = Path("results.json")
+    results_file = Path("scrapy_project/results.json")
     
     if not results_file.exists():
         st.warning("🔍 No results file found. The search may not have completed successfully.")
