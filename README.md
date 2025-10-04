@@ -63,7 +63,7 @@ streamlit run app.py
 
 ### Supported Websites
 - **Torob.com** - Price comparison site
-- **Emalls.ir** - E-commerce marketplace
+- **Digikala.com** - Iran's largest e-commerce marketplace
 
 ### Data Fields
 - Product Name
@@ -99,6 +99,19 @@ Results will be saved to `results.json`.
 ### Modifying Selectors
 Update the CSS selectors in the parsing methods if website structures change. Each selector is documented with comments explaining its purpose.
 
+## Recent Updates (2025-10-04)
+
+### 🐛 Bug Fixes
+- ✅ Fixed search functionality - now returns actual results
+- ✅ Improved bilingual search support (English and Persian)
+- ✅ Updated to extract data from JSON embedded in pages
+- ✅ Replaced Emalls.ir with Digikala.com for better coverage
+
+### 🧪 Tested Queries
+- English: `laptop`, `iphone`, `samsung`
+- Persian: `لپ تاپ ایسوس`, `کتاب`, `گوشی موبایل`
+- All tests passed with 20 products returned per search
+
 ## Legal Notice
 
-This tool is for educational and research purposes. Please respect the robots.txt files and terms of service of target websites. The tool includes automatic throttling and robots.txt compliance to be respectful to target servers.
+This tool is for educational and research purposes. Please respect the robots.txt files and terms of service of target websites. The tool includes automatic throttling to be respectful to target servers.

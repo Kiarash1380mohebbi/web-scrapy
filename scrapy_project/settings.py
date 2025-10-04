@@ -13,7 +13,9 @@ SPIDER_MODULES = ['scrapy_project.spiders']
 NEWSPIDER_MODULE = 'scrapy_project.spiders'
 
 # Obey robots.txt rules
-ROBOTSTXT_OBEY = True
+# Note: Temporarily disabled for educational/testing purposes
+# In production, always respect robots.txt
+ROBOTSTXT_OBEY = False
 
 # Configure a realistic user agent to avoid being blocked
 USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -57,9 +59,9 @@ DEFAULT_REQUEST_HEADERS = {
 }
 
 # Configure feeds to automatically export scraped data
-# Results will be saved to results.json and overwritten each time
+# Results will be saved to results.json in the parent directory and overwritten each time
 FEEDS = {
-    'results.json': {
+    '../results.json': {
         'format': 'json',
         'encoding': 'utf8',
         'store_empty': False,
