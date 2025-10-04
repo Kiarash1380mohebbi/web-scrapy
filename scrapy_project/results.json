@@ -1,0 +1,6 @@
+[
+{"product_name": "کتاب برنامه نویسی پایتون", "price": 450000.0, "store_name": "کتاب‌آنلاین", "product_url": "https://example.com/product/1"},
+{"product_name": "کتاب یادگیری ماشین", "price": 380000.0, "store_name": "نشر فنی", "product_url": "https://example.com/product/2"},
+{"product_name": "کتاب طراحی وب", "price": 320000.0, "store_name": "کتاب‌آنلاین", "product_url": "https://example.com/product/3"},
+{"product_name": "کتاب هوش مصنوعی", "price": 520000.0, "store_name": "نشر فنی", "product_url": "https://example.com/product/4"}
+]
