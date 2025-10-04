@@ -1,18 +1,21 @@
 import scrapy
 import urllib.parse
+import json
+import re
 from scrapy_project.items import ProductItem
 
 
 class ProductSearchSpider(scrapy.Spider):
     """
     A versatile spider for crawling multiple Iranian e-commerce websites.
+    Supports bilingual search (English and Persian/Farsi).
     
     Usage:
     scrapy crawl product_search -a query="your search term"
     """
     
     name = 'product_search'
-    allowed_domains = ['torob.com', 'emalls.ir']
+    allowed_domains = ['torob.com', 'digikala.com']
     
     def __init__(self, query=None, *args, **kwargs):
         super(ProductSearchSpider, self).__init__(*args, **kwargs)
@@ -24,12 +27,13 @@ class ProductSearchSpider(scrapy.Spider):
         self.logger.info(f"Starting search for: {query}")
         
         # URL-encode the query for safe inclusion in URLs
-        encoded_query = urllib.parse.quote_plus(query)
+        # This handles both English and Persian characters
+        encoded_query = urllib.parse.quote(query)
         
         # Generate start URLs dynamically based on the query
         self.start_urls = [
             f'https://torob.com/search/?query={encoded_query}',
-            f'https://emalls.ir/search/{encoded_query}',
+            f'https://www.digikala.com/search/?q={encoded_query}',
         ]
         
         self.logger.info(f"Generated URLs: {self.start_urls}")
@@ -43,8 +47,8 @@ class ProductSearchSpider(scrapy.Spider):
         try:
             if 'torob.com' in url:
                 yield from self.parse_torob(response)
-            elif 'emalls.ir' in url:
-                yield from self.parse_emalls(response)
+            elif 'digikala.com' in url:
+                yield from self.parse_digikala(response)
             else:
                 self.logger.warning(f"No parser found for URL: {response.url}")
         except Exception as e:
@@ -53,39 +57,53 @@ class ProductSearchSpider(scrapy.Spider):
     def parse_torob(self, response):
         """
         Parser for Torob.com search results.
+        Extracts data from the __NEXT_DATA__ JSON embedded in the page.
         """
         self.logger.info(f"Parsing Torob results from: {response.url}")
         
         try:
-            # CSS selector for product containers on Torob
-            # Targets each product card in the search results
-            product_cards = response.css('div.product-card, div[data-testid="product-card"], .search-result-item')
+            # Extract the JSON data from the __NEXT_DATA__ script tag
+            script_data = response.xpath('//script[@id="__NEXT_DATA__"]/text()').get()
             
-            if not product_cards:
-                # Alternative selectors if the main one doesn't work
-                product_cards = response.css('.product-item, .result-item, [class*="product"]')
+            if not script_data:
+                self.logger.warning("Could not find __NEXT_DATA__ script in Torob page")
+                return
             
-            self.logger.info(f"Found {len(product_cards)} product cards on Torob")
+            # Parse the JSON data
+            data = json.loads(script_data)
             
-            for card in product_cards[:20]:  # Limit to first 20 results
+            # Navigate to the products in the JSON structure
+            # The structure is: props -> pageProps -> products (array)
+            try:
+                products = data.get('props', {}).get('pageProps', {}).get('products', [])
+            except (KeyError, AttributeError) as e:
+                self.logger.warning(f"Could not extract products from Torob JSON: {e}")
+                return
+            
+            self.logger.info(f"Found {len(products)} products on Torob")
+            
+            for product in products[:20]:  # Limit to first 20 results
                 item = ProductItem()
                 
-                # Extract product name - targets the main product title link
-                name_selector = card.css('h3 a::text, .product-title::text, .title a::text, h2 a::text').get()
-                if name_selector:
-                    item['product_name'] = name_selector.strip()
-                else:
-                    continue  # Skip if no name found
+                # Extract product name
+                product_name = product.get('name1') or product.get('name2')
+                if not product_name:
+                    continue
                 
-                # Extract price - targets price display elements
-                price_selector = card.css('.price::text, .product-price::text, [class*="price"]::text').get()
-                if price_selector:
-                    item['price'] = price_selector.strip()
+                item['product_name'] = product_name.strip()
                 
-                # Extract product URL - targets the main product link
-                url_selector = card.css('h3 a::attr(href), .product-title::attr(href), .title a::attr(href)').get()
-                if url_selector:
-                    item['product_url'] = response.urljoin(url_selector)
+                # Extract price (lowest price from shops)
+                price = product.get('price')
+                if price:
+                    item['price'] = str(price)
+                
+                # Extract product URL
+                product_url = product.get('web_client_absolute_url') or product.get('id')
+                if product_url:
+                    if not product_url.startswith('http'):
+                        item['product_url'] = f"https://torob.com{product_url}"
+                    else:
+                        item['product_url'] = product_url
                 
                 # Set store name
                 item['store_name'] = 'Torob'
@@ -94,55 +112,93 @@ class ProductSearchSpider(scrapy.Spider):
                 if item.get('product_name'):
                     yield item
                     
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Error decoding JSON from Torob: {str(e)}")
         except Exception as e:
             self.logger.error(f"Error parsing Torob page: {str(e)}")
     
-    def parse_emalls(self, response):
+    def parse_digikala(self, response):
         """
-        Parser for Emalls.ir search results.
+        Parser for Digikala.com search results.
+        Extracts data from the __NEXT_DATA__ JSON embedded in the page.
         """
-        self.logger.info(f"Parsing Emalls results from: {response.url}")
+        self.logger.info(f"Parsing Digikala results from: {response.url}")
         
         try:
-            # CSS selector for product containers on Emalls
-            # Targets each product item in the search results grid
-            product_cards = response.css('.product-item, .search-item, div[class*="product"], .item-box')
+            # Extract the JSON data from the __NEXT_DATA__ script tag
+            script_data = response.xpath('//script[@id="__NEXT_DATA__"]/text()').get()
             
-            if not product_cards:
-                # Alternative selectors for different page layouts
-                product_cards = response.css('.product, .result-item, [class*="item"]')
+            if not script_data:
+                self.logger.warning("Could not find __NEXT_DATA__ script in Digikala page")
+                return
             
-            self.logger.info(f"Found {len(product_cards)} product cards on Emalls")
+            # Parse the JSON data
+            data = json.loads(script_data)
             
-            for card in product_cards[:20]:  # Limit to first 20 results
+            # Navigate to the products in the JSON structure
+            # The structure may vary, so we need to explore it
+            try:
+                page_props = data.get('props', {}).get('pageProps', {})
+                
+                # Try to find products in various possible locations
+                products = []
+                if 'initialState' in page_props:
+                    products = page_props.get('initialState', {}).get('entities', {}).get('products', [])
+                elif 'searchData' in page_props:
+                    products = page_props.get('searchData', {}).get('products', [])
+                elif 'products' in page_props:
+                    products = page_props.get('products', [])
+                
+                # If products is a dict, convert to list
+                if isinstance(products, dict):
+                    products = list(products.values())
+                    
+            except (KeyError, AttributeError) as e:
+                self.logger.warning(f"Could not extract products from Digikala JSON: {e}")
+                return
+            
+            self.logger.info(f"Found {len(products)} products on Digikala")
+            
+            for product in products[:20]:  # Limit to first 20 results
                 item = ProductItem()
                 
-                # Extract product name - targets the product title
-                name_selector = card.css('h3::text, .product-name::text, .title::text, h2::text, a[title]::attr(title)').get()
-                if name_selector:
-                    item['product_name'] = name_selector.strip()
-                else:
-                    continue  # Skip if no name found
+                # Extract product name (try different field names)
+                product_name = product.get('title') or product.get('name') or product.get('title_fa')
+                if not product_name:
+                    continue
                 
-                # Extract price - targets various price display formats
-                price_selector = card.css('.price::text, .product-price::text, .cost::text, [class*="price"]::text').get()
-                if price_selector:
-                    item['price'] = price_selector.strip()
+                item['product_name'] = product_name.strip()
                 
-                # Extract product URL - targets the main product link
-                url_selector = card.css('a::attr(href)').get()
-                if url_selector:
-                    item['product_url'] = response.urljoin(url_selector)
+                # Extract price
+                price_data = product.get('price') or product.get('default_variant', {}).get('price')
+                if price_data:
+                    if isinstance(price_data, dict):
+                        price = price_data.get('selling_price') or price_data.get('rrp_price')
+                    else:
+                        price = price_data
+                    
+                    if price:
+                        # Convert from Rial to Toman (divide by 10)
+                        item['price'] = str(int(price) // 10)
+                
+                # Extract product URL
+                product_url = product.get('url') or product.get('url_fa')
+                if product_url:
+                    if not product_url.startswith('http'):
+                        product_url = f"https://www.digikala.com{product_url}"
+                    item['product_url'] = product_url
                 
                 # Set store name
-                item['store_name'] = 'Emalls'
+                item['store_name'] = 'Digikala'
                 
                 # Only yield if we have essential data
                 if item.get('product_name'):
                     yield item
                     
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Error decoding JSON from Digikala: {str(e)}")
         except Exception as e:
-            self.logger.error(f"Error parsing Emalls page: {str(e)}")
+            self.logger.error(f"Error parsing Digikala page: {str(e)}")
     
     def parse_error(self, failure):
         """
